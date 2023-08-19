@@ -72,7 +72,7 @@ p_mac_elementary = r'[0-9a-fA-F][0-9a-fA-F]:){5}([0-9a-fA-F][0-9a-fA-F]'
 p_ip_nmap5 = r'Interesting.*on\s(?:(?P<fqdn_nmap5>.*) (?=\((?P<ip_nmap5>%s)\)))|Interesting.*on\s(?P<ip_only_nmap5>.*)\:' % p_ip_elementary
 p_ip_nmap6 = r'Nmap.*for\s(?:(?P<fqdn_nmap6>.*) (?=\((?P<ip_nmap6>%s)\)))|Nmap.*for\s(?P<ip_only_nmap6>%s)$' % (p_ip_elementary, p_ip_elementary)
 
-p_ip = re.compile('%s|%s' % (p_ip_nmap5, p_ip_nmap6))
+p_ip = re.compile(f'{p_ip_nmap5}|{p_ip_nmap6}')
 
 #-- rDNS
 p_rdns = re.compile(r'rDNS record for (?P<ip>%s):\s(?P<rdns>.*)$' % p_ip_elementary)
@@ -183,45 +183,35 @@ class Host:
         if not(self.get_port_list()):
             return ['']
         else:
-            result = []
-            for port in self.get_port_list():
-                result.append(port.get_number())
+            result = [port.get_number() for port in self.get_port_list()]
         return result
     
     def get_port_protocol_list(self):
         if not(self.get_port_list()):
             return ['']
         else:
-            result = []
-            for port in self.get_port_list():
-                result.append(port.get_protocol())
+            result = [port.get_protocol() for port in self.get_port_list()]
         return result
 
     def get_port_service_list(self):
         if not(self.get_port_list()):
             return ['']
         else:
-            result = []
-            for port in self.get_port_list():
-                result.append(port.get_service())
+            result = [port.get_service() for port in self.get_port_list()]
         return result
 
     def get_port_version_list(self):
         if not(self.get_port_list()):
             return ['']
         else:
-            result = []
-            for port in self.get_port_list():
-                result.append(port.get_version())
+            result = [port.get_version() for port in self.get_port_list()]
         return result
 
     def get_port_script_list(self):
         if not(self.get_port_list()):
             return ['']
         else:
-            result = []
-            for port in self.get_port_list():
-                result.append(port.get_script())
+            result = [port.get_script() for port in self.get_port_list()]
         return result
     
     def get_os(self):
@@ -340,68 +330,54 @@ def parse(fd):
         @rtype : return a list of <Host> objects indexed from their numerical IP representation
     """
     global p_ip_elementary, p_ip, p_port_without_reason, p_port_with_reason, p_grepable, p_script, p_mac, p_os, p_network_dist, p_rdns
-    
+
     IPs = {}
     last_host = None
     p_port = p_port_without_reason
     in_script_line = False
     script = ''
-    
+
     lines = [l.rstrip() for l in fd.readlines()]
     for line in lines:
         
-        # 1st case:     Nmap Normal Output
-        #-- 1st action: Grab the IP
-        IP = p_ip.search(line)
-        if IP:
+        if IP := p_ip.search(line):
             # Check out what patterns matched
             IP_potential_match = [IP.group('ip_nmap5'), IP.group('ip_only_nmap5'), IP.group('ip_nmap6'), IP.group('ip_only_nmap6')]
             IP_str = unique_match_from_list(IP_potential_match)
-            
+
             FQDN_potential_match = [IP.group('fqdn_nmap5'), IP.group('fqdn_nmap6')]
             FQDN_str = unique_match_from_list(FQDN_potential_match)
-            
+
             new_host = Host(IP_str, FQDN_str)
-            
+
             IPs[new_host.get_ip_num_format()] = new_host
-            
+
             last_host = new_host
-        
-        # 1st case: Nmap Normal Output
-        #-- 2nd action: Check if there is a rDNS record
-        rDNS = p_rdns.search(line)
-        if rDNS:
+
+        if rDNS := p_rdns.search(line):
             if rDNS.group('ip') and rDNS.group('rdns'):
                 rdns_ip_num_format = str(dottedquad_to_num(rDNS.group('ip')))
-                if rdns_ip_num_format in IPs.keys():
+                if rdns_ip_num_format in IPs:
                     IPs[rdns_ip_num_format].set_rdns_record(rDNS.group('rdns'))
-        
-        # 1st case:     Nmap Normal Output
-        #-- 3rd action: Check the port header, to know if there is a reason column
-        port_header = p_port_header.search(line)
-        if port_header:
+
+        if port_header := p_port_header.search(line):
             if port_header.group('reason'):
                 p_port = p_port_with_reason
             else:
                 p_port = p_port_without_reason
-                
-        # 1st case:     Nmap Normal Output
-        #-- 4th action: Grab the script output
-        script_line = p_script.search(line)
-        if script_line:
+
+        if script_line := p_script.search(line):
             in_script_line = True
             script = script + script_line.group('script') + '\n'
-        else:
-            # We were in a script output section, now it's finished
-            if in_script_line:
-                last_port = last_host.get_port_list()[-1]
-                last_port = last_port.set_script(script)
-                
-                # reseting trackers
-                in_script_line = False
-                script = ''
-        
-        
+        elif in_script_line:
+            last_port = last_host.get_port_list()[-1]
+            last_port = last_port.set_script(script)
+
+            # reseting trackers
+            in_script_line = False
+            script = ''
+
+
         # 1st case:     Nmap Normal Output
         #-- 5th action: Grab the port
         port = p_port.search(line)
@@ -410,45 +386,33 @@ def parse(fd):
             protocol = str(port.group('protocol'))
             service = str(port.group('service'))
             version = str(port.group('version'))
-                        
+
             new_port = Port(number, protocol, service, version)
-            
+
             last_host.add_port(new_port)
-        
-        
-        # 1st case:     Nmap Normal Output
-        #-- 6th action: Grab the MAC address
-        mac = p_mac.search(line)
-        if mac:
+
+
+        if mac := p_mac.search(line):
             last_host.set_mac(str(mac.group('mac_addr')), str(mac.group('mac_vendor')))
-        
-        
-        # 1st case:     Nmap Normal Output  
-        #-- 7th action: Grab the OS detection
-        os = p_os.search(line)
-        if os:
+
+
+        if os := p_os.search(line):
             last_host.set_os(str(os.group('os')))
-        
-        
-        # 1st case:     Nmap Normal Output
-        #-- 8th action: Grab the network distance
-        network_distance = p_network_dist.search(line)
-        if network_distance:
+
+
+        if network_distance := p_network_dist.search(line):
             last_host.set_network_distance(str(network_distance.group('hop_number')))
-        
-        
-        # 2nd case:         Nmap Grepable Output
-        #-- 1 sole action:  Grab the whole line for further splitting
-        grepable = p_grepable.search(line)
-        if grepable:
+
+
+        if grepable := p_grepable.search(line):
             if grepable.group('whole_line'):
                 new_host = split_grepable_match(grepable.group('whole_line'))
-                
+
                 # Update the occurence found with 'Status: Up'
                 IPs[new_host.get_ip_num_format()] = new_host
-                
+
                 last_host = new_host
-    
+
     return IPs
 
 
@@ -467,7 +431,7 @@ def parse_xml(xml_file):
     except ET.ParseError as e:
         print("[!] An error has occurred while parsing the XML file: '%s'.\nExiting" % e)
         return None
-    
+
     for host in root.findall('host'):
         if 'up' in host.find('status').get('state'):
             # IP, MAC
@@ -476,12 +440,12 @@ def parse_xml(xml_file):
                 if 'ipv4' in address.get('addrtype') and address.get('addr'):
                     ip_dottedquad = address.get('addr')
                     new_host = Host(ip_dottedquad)
-                    
+
                 if 'mac' in address.get('addrtype'):
                     mac_addr = address.get('addr')
                     mac_vendor = address.get('vendor')
                     new_host.set_mac(mac_addr, mac_vendor)
-            
+
             # FQDN, RDNS
             hostnames = host.findall('./hostnames/hostname')
             for hostname in hostnames:
@@ -489,46 +453,46 @@ def parse_xml(xml_file):
                     new_host.set_fqdn(hostname.get('name'))
                 if hostname.get('name') and 'PTR' in hostname.get('type'):
                     new_host.set_rdns_record(hostname.get('name'))
-            
+
             # Ports (protocol, number, service, version) and script output
             open_ports = host.findall("./ports/port/state[@state='open']/..")
             for port in open_ports:
                 protocol = port.get('protocol')
                 number = port.get('portid')
                 new_port = Port(number, protocol)
-                
+
                 service = port.find('service')
                 if service != None:
                     service_name = service.get('name') if service.get('name') else ''
-                    
+
                     service_product = service.get('product') if service.get('product') else ''
                     service_version = service.get('version') if service.get('version') else ''
                     service_extrainfo = service.get('extrainfo') if service.get('extrainfo') else ''
-                    
-                    version = ("%s %s %s" % (service_product, service_version, service_extrainfo)).strip()
-                    new_port.set_service(service_name) 
+
+                    version = f"{service_product} {service_version} {service_extrainfo}".strip()
+                    new_port.set_service(service_name)
                     new_port.set_version(version)
-                
+
                 scripts = port.findall('script')
                 script_output = ''
                 for script in scripts:
                     script_output = script_output + "\n%s: %s" % (script.get('id'), script.get('output'))
 
                 new_port.set_script(script_output)
-                
+
                 new_host.add_port(new_port)
-                
+
             # OS
             osmatches = host.findall('./os/osmatch')
             os = "|".join(osmatch.get('name') for osmatch in osmatches)
             new_host.set_os(os)
-        
+
             # Hop
             hop_number = len(host.findall('./trace/hop'))
             new_host.set_network_distance(hop_number)
-                
+
             IPs[new_host.get_ip_num_format()] = new_host
-    
+
     return IPs
     
 def is_format_valid(fmt):
@@ -540,16 +504,12 @@ def is_format_valid(fmt):
         @rtype : True or False
     """ 
     supported_format_objects = [ 'fqdn', 'rdns', 'hop_number', 'ip', 'mac_address', 'mac_vendor', 'port', 'protocol', 'os', 'script', 'service', 'version' ]
-    unknown_items = []
-    
-    for fmt_object in fmt.split('-'):
-        if not(fmt_object in supported_format_objects):
-            unknown_items.append(fmt_object)
-    
-    if unknown_items:
-        return False, unknown_items
-    else:
-        return True, None
+    unknown_items = [
+        fmt_object
+        for fmt_object in fmt.split('-')
+        if fmt_object not in supported_format_objects
+    ]
+    return (False, unknown_items) if unknown_items else (True, None)
 
 def formatted_item(host, format_item):
     """
@@ -575,11 +535,8 @@ def formatted_item(host, format_item):
                     'version':              host.get_port_version_list(),
                     'script':               host.get_port_script_list()
                      }
-        
-        if format_item in option_map.keys():
-            return option_map[format_item]
-        else:
-            return ''
+
+        return option_map.get(format_item, '')
     else:
         return []
 
@@ -632,47 +589,47 @@ def generate_csv(fd, results, options):
 
 def main():
     global parser
-    
+
     options = parser.parse_args()
-    
+
     # Supplied format
     if options.script:
         options.format = options.script
-    
+
     valid_format, unknown_items = is_format_valid(options.format)
     if not valid_format:
         parser.error("Please specify a valid output format: '%s' is invalid \n\
          Supported objects are { fqdn, rdns, hop_number, ip, mac_address, mac_vendor, port, protocol, os, script, service, version }" % ', '.join(unknown_items))
-    
+
     # Input selection
     if (options.input != None) and (options.xml_input != None):
         parser.error("Please specify either a normal/grepable or an XML input file")
-    
-    elif (options.input == None) and (options.xml_input != None):
+
+    elif options.input is None and options.xml_input != None:
         results = parse_xml(options.xml_input)
-    
-    elif options.xml_input == None:
-        if options.input != None:
-            fd_input = open(options.input, fd_read_options)
-        else:
+
+    else:
+        if options.input is None:
         # No input file specified, reading from stdin
             fd_input = sys.stdin
-    
+
+        else:
+            fd_input = open(options.input, fd_read_options)
         # Analysis  
         results = parse(fd_input)
         fd_input.close()
-     
+
     # Output descriptor
-    if options.output != None:
-        fd_output = open(options.output, fd_write_options)
-    else:
+    if options.output is None:
         # No output file specified, writing to stdout
         fd_output = sys.stdout
-    
+
+    else:
+        fd_output = open(options.output, fd_write_options)
     # CSV output
     generate_csv(fd_output, results, options)
     fd_output.close()
-    
+
     return
 
 if __name__ == "__main__":

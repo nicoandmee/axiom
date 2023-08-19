@@ -42,8 +42,7 @@ def merge_nMap(xmlFile,mf):
 	return HOSTS
 
 def addHeader(f):
-	nMap_Header  = '<?xml version="1.0" encoding="UTF-8"?>'
-	nMap_Header += '<!DOCTYPE nmaprun>'
+	nMap_Header = '<?xml version="1.0" encoding="UTF-8"?>' + '<!DOCTYPE nmaprun>'
 	nMap_Header += '<?xml-stylesheet href="file://'+expanduser("~")+'/.axiom/interact/includes/nmap-bootstrap.xsl" type="text/xsl"?>'
 	nMap_Header += '<!-- Nmap Merged with nMapMergER.py https://github.com/CBHue/nMapMergER -->'
 	nMap_Header += '<nmaprun scanner="nmap" args="nmap -iL hostList.txt" start="1" startstr="https://github.com/CBHue/nMapMerge/nMapMerge.py" version="7.70" xmloutputversion="1.04">'
@@ -51,25 +50,23 @@ def addHeader(f):
 	nMap_Header += '<verbose level="0"/>'
 	nMap_Header += '<debugging level="0"/>'
 
-	mFile = open(f, "w")  
-	mFile.write(nMap_Header) 
-	mFile.close()
+	with open(f, "w") as mFile:
+		mFile.write(nMap_Header)
 
 def addFooter(f, h):
-	nMap_Footer  = '<runstats><finished time="1" timestr="Wed Sep  0 00:00:00 0000" elapsed="0" summary="Nmap done at Wed Sep  0 00:00:00 0000; ' + str(h) + ' IP address scanned in 0.0 seconds" exit="success"/>'
+	nMap_Footer = f'<runstats><finished time="1" timestr="Wed Sep  0 00:00:00 0000" elapsed="0" summary="Nmap done at Wed Sep  0 00:00:00 0000; {str(h)} IP address scanned in 0.0 seconds" exit="success"/>'
 	nMap_Footer += '</runstats>'
 	nMap_Footer += '</nmaprun>'
 
-	mFile = open(f, "a")  
-	mFile.write(nMap_Footer) 
-	mFile.close()
+	with open(f, "a") as mFile:
+		mFile.write(nMap_Footer)
 
 def htmlER(mergeFile):
 	import os
 	cmd = '/usr/bin/xsltproc'
 	if os.path.isfile(cmd):
-		out = mergeFile + ".html"
-		cmd = cmd + " -o " + out + " " + mergeFile
+		out = f"{mergeFile}.html"
+		cmd = f"{cmd} -o {out} {mergeFile}"
 		os.system(cmd)
 		print ("Output HTML File:", os.path.abspath(out))
 	else:

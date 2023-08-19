@@ -33,19 +33,14 @@ def parse_args():
     parser.add_argument('--port', type=int, default=27017, help='MongoDB port')
     parser.add_argument('--database', type=str, default='nmap', help='MongoDB database')
 
-    args = parser.parse_args()
-
-    return args
+    return parser.parse_args()
 
 
 def mongodb_connect(host, port, database):
     try:
         client = pymongo.MongoClient(host, port)
         client.server_info()
-        db = client[database]
-
-        return db
-
+        return client[database]
     except Exception as e:
         print(e)
         exit(1)
@@ -302,23 +297,21 @@ if __name__ == '__main__':
 
     # drop database if requested
     if args.drop:
-        ans = input('\nDrop database \"{}\" [y/N]: '.format(args.database))
+        ans = input(f'\nDrop database \"{args.database}\" [y/N]: ')
         if ans.lower() == 'y':
             mongodb_dropdatabase(args.host, args.port, args.database)
-            print('Database \"{}\" dropped'.format(args.database))
+            print(f'Database \"{args.database}\" dropped')
 
     db = mongodb_connect(args.host, args.port, args.database)
 
-    # check if the nmap xml reports close tag are present
-    reports_tree_not_closed = []
-    for report in reports:
-        if not is_nmap_report_tree_close_tag_exist(report):
-            reports_tree_not_closed.append(report)
-
-    if len(reports_tree_not_closed) != 0:
+    if reports_tree_not_closed := [
+        report
+        for report in reports
+        if not is_nmap_report_tree_close_tag_exist(report)
+    ]:
         print('\nXML nmap report not properly closed for report(s):')
         for report in reports_tree_not_closed:
-            print(' - {}'.format(report))
+            print(f' - {report}')
 
         ans = input('\nDo you want to close the XML tree of those reports [y/N]: '.format(args.database))
         if ans.lower() == 'y':
@@ -342,14 +335,14 @@ if __name__ == '__main__':
             parse_servers(nmap_xml_report, db)
             parse_services(nmap_xml_report, db)
 
-            print(' - {}'.format(report))
-            
+            print(f' - {report}')
+
         except:
             parsing_error_files.append(report)
-        
-    if len(parsing_error_files) != 0:
+
+    if parsing_error_files:
         print('\nUnable to parse file(s):')
         for report in parsing_error_files:
-            print(' - {}'.format(report))
+            print(f' - {report}')
 
     print()
